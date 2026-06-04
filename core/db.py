@@ -1,4 +1,9 @@
-"""Modelos SQLAlchemy y utilidades de base de datos."""
+"""Modelos SQLAlchemy y utilidades de base de datos.
+
+Soporta dos backends:
+  - PostgreSQL (Supabase): cuando [supabase] db_url está en .streamlit/secrets.toml.
+  - SQLite local (fallback): data/nomina.db cuando no hay secrets configurados.
+"""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -17,7 +22,40 @@ DATA_DIR.mkdir(exist_ok=True)
 PDF_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "nomina.db"
 
-engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
+
+def _crear_engine():
+    """Devuelve el engine correcto según los secrets disponibles.
+
+    Prioridad:
+    1. PostgreSQL (Supabase) si secrets.toml contiene [supabase] db_url válida.
+    2. SQLite local como fallback (desarrollo / sin conexión).
+    """
+    db_url: str | None = None
+    try:
+        import streamlit as st
+        raw = st.secrets.get("supabase", {}).get("db_url", "")
+        # Ignorar si el placeholder no fue reemplazado
+        if raw and "[TU-PASSWORD]" not in raw and raw.startswith("postgresql"):
+            db_url = raw
+    except Exception:
+        pass
+
+    if db_url:
+        return create_engine(
+            db_url,
+            echo=False,
+            future=True,
+            pool_pre_ping=True,   # detecta conexiones caídas
+            pool_size=5,
+            max_overflow=10,
+            connect_args={"sslmode": "require"},
+        )
+
+    # ── Fallback: SQLite local ────────────────────────────────────────────────
+    return create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
+
+
+engine = _crear_engine()
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
 
@@ -151,7 +189,15 @@ def init_db():
 
 
 def _migrate():
-    """Migraciones incrementales para SQLite."""
+    """Migraciones incrementales.
+
+    En PostgreSQL (Supabase) las tablas se crean siempre limpias mediante
+    create_all(), por lo que no se requieren migraciones manuales.
+    Solo se ejecuta la migración de SQLite cuando el backend es local.
+    """
+    if engine.dialect.name != "sqlite":
+        return  # PostgreSQL: esquema gestionado por create_all()
+
     with engine.connect() as conn:
         cols_cadena = {r[1] for r in conn.execute(text("PRAGMA table_info(deduccion_cadena)"))}
         if "fecha" not in cols_cadena:
