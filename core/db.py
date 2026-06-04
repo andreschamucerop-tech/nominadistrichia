@@ -23,6 +23,9 @@ PDF_DIR.mkdir(exist_ok=True)
 DB_PATH = DATA_DIR / "nomina.db"
 
 
+Base = declarative_base()
+
+
 def _crear_engine():
     """Devuelve el engine correcto según los secrets disponibles.
 
@@ -33,8 +36,9 @@ def _crear_engine():
     db_url: str | None = None
     try:
         import streamlit as st
-        raw = st.secrets.get("supabase", {}).get("db_url", "")
-        # Ignorar si el placeholder no fue reemplazado
+        # Acceso directo al atributo para evitar problemas con AttrDict de Streamlit
+        supabase_secrets = st.secrets["supabase"]
+        raw = supabase_secrets["db_url"]
         if raw and "[TU-PASSWORD]" not in raw and raw.startswith("postgresql"):
             db_url = raw
     except Exception:
@@ -45,7 +49,7 @@ def _crear_engine():
             db_url,
             echo=False,
             future=True,
-            pool_pre_ping=True,   # detecta conexiones caídas
+            pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
             connect_args={"sslmode": "require"},
@@ -55,9 +59,24 @@ def _crear_engine():
     return create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
 
 
-engine = _crear_engine()
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
-Base = declarative_base()
+try:
+    import streamlit as st
+
+    @st.cache_resource
+    def _get_engine():
+        return _crear_engine()
+
+except ImportError:
+    def _get_engine():  # type: ignore[misc]
+        return _crear_engine()
+
+
+def _engine():
+    return _get_engine()
+
+
+def _session_factory():
+    return sessionmaker(bind=_engine(), autoflush=False, autocommit=False, future=True)
 
 
 class Admin(Base):
@@ -184,7 +203,7 @@ class LiquidacionQuincena(Base):
 
 
 def init_db():
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(_engine())
     _migrate()
 
 
@@ -195,14 +214,14 @@ def _migrate():
     create_all(), por lo que no se requieren migraciones manuales.
     Solo se ejecuta la migración de SQLite cuando el backend es local.
     """
-    if engine.dialect.name != "sqlite":
+    eng = _engine()
+    if eng.dialect.name != "sqlite":
         return  # PostgreSQL: esquema gestionado por create_all()
 
-    with engine.connect() as conn:
+    with eng.connect() as conn:
         cols_cadena = {r[1] for r in conn.execute(text("PRAGMA table_info(deduccion_cadena)"))}
         if "fecha" not in cols_cadena:
             conn.execute(text("ALTER TABLE deduccion_cadena ADD COLUMN fecha DATE"))
-            # Convierte registros viejos "YYYY-MM" → "YYYY-MM-01"
             conn.execute(text(
                 "UPDATE deduccion_cadena SET fecha = mes || '-01' "
                 "WHERE mes IS NOT NULL AND fecha IS NULL"
@@ -211,4 +230,4 @@ def _migrate():
 
 
 def get_session():
-    return SessionLocal()
+    return _session_factory()()
