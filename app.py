@@ -96,15 +96,16 @@ hr { border-color: #5B9B2A !important; opacity: 0.3; }
 </style>
 """, unsafe_allow_html=True)
 
-# Seed silencioso. Si genera password, la muestra en consola.
 pwd = seed_inicial()
 if pwd:
-    print("\n" + "=" * 60)
-    print(" Usuario admin creado en la base de datos.")
-    print(f" Usuario:    admin")
-    print(f" Contraseña: {pwd}")
-    print(" (Cámbiala desde la página de Configuración tras iniciar sesión.)")
-    print("=" * 60 + "\n")
+    st.warning(
+        f"**Admin creado por primera vez.**\n\n"
+        f"**Usuario:** admin\n\n"
+        f"**Contraseña:** `{pwd}`\n\n"
+        f"Anótala y cámbiala desde Configuración.",
+        icon="🔑",
+    )
+    st.stop()
 
 requerir_login()
 
