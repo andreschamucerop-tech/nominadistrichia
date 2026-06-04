@@ -1,0 +1,7 @@
+streamlit>=1.32
+pandas>=2.2
+openpyxl>=3.1
+sqlalchemy>=2.0
+reportlab>=4.1
+bcrypt>=4.1
+holidays>=0.46
