@@ -9,6 +9,8 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 
+from urllib.parse import quote, unquote, urlparse, urlunparse
+
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Float, ForeignKey, Integer,
     String, Time, create_engine, text,
@@ -26,6 +28,18 @@ DB_PATH = DATA_DIR / "nomina.db"
 Base = declarative_base()
 
 
+def _encode_db_url(url: str) -> str:
+    """Re-codifica el password en la URL para manejar caracteres especiales como & y !."""
+    parsed = urlparse(url)
+    if not parsed.password:
+        return url
+    password = quote(unquote(parsed.password), safe="")
+    username = quote(unquote(parsed.username or ""), safe=".")
+    port_part = f":{parsed.port}" if parsed.port else ""
+    netloc = f"{username}:{password}@{parsed.hostname}{port_part}"
+    return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+
+
 def _crear_engine():
     """Devuelve el engine correcto según los secrets disponibles.
 
@@ -40,7 +54,7 @@ def _crear_engine():
         supabase_secrets = st.secrets["supabase"]
         raw = supabase_secrets["db_url"]
         if raw and "[TU-PASSWORD]" not in raw and raw.startswith("postgresql"):
-            db_url = raw
+            db_url = _encode_db_url(raw)
     except Exception:
         pass
 
