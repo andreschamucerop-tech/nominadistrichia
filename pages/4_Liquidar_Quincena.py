@@ -46,7 +46,7 @@ with c3:
     )
 
 ult_dia = monthrange(int(anio), int(mes))[1]
-if quincena.startswith("1"):
+if quincena == "1 - 15":
     periodo_inicio = date(int(anio), int(mes), 1)
     periodo_fin = date(int(anio), int(mes), 15)
 else:
