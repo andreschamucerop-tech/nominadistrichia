@@ -153,8 +153,8 @@ def _flowables_real(
     )
 
     deveng = [["Devengado", "Valor"]]
-    deveng.append([f"Salario ({r.dias_periodo} días)", _fmt(r.salario_proporcional)])
-    deveng.append([f"Auxilio de transporte ({r.dias_periodo} días)", _fmt(r.aux_transporte_real)])
+    deveng.append(["Salario (15 días)", _fmt(r.salario_proporcional)])
+    deveng.append(["Auxilio de transporte (15 días)", _fmt(r.aux_transporte_real)])
     if r.h_ext > 0:
         deveng.append([
             f"Horas extras ({r.h_ext:.2f} h × {_fmt(empresa.valor_hora_extra)})",
@@ -225,8 +225,8 @@ def _flowables_minimo(
     )
 
     deveng = [["Devengado", "Valor"]]
-    deveng.append([f"Salario mínimo ({r.dias_periodo} días)", _fmt(r.smmlv_proporcional)])
-    deveng.append([f"Auxilio de transporte ({r.dias_periodo} días)", _fmt(r.aux_transporte_proporcional)])
+    deveng.append(["Salario mínimo (15 días)", _fmt(r.smmlv_proporcional)])
+    deveng.append(["Auxilio de transporte (15 días)", _fmt(r.aux_transporte_proporcional)])
     deveng.append(["Total devengado", _fmt(r.devengado_min)])
     el.append(_tabla_concepto_valor(deveng, styles))
     el.append(Spacer(1, 0.3 * cm))
