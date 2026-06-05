@@ -1,12 +1,11 @@
 """Cálculo de liquidación quincenal: real y 'como salario mínimo'."""
 from __future__ import annotations
 
+from calendar import monthrange
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 import holidays as holidays_lib
 from sqlalchemy.orm import Session
-
-from sqlalchemy import func
 
 from core.db import (
     DeduccionCadena, Empleado, Empresa, FacturaQuincena,
@@ -193,12 +192,16 @@ def liquidar(
     r.facturas = list(facts)
     r.facturas_total = round(sum(f.valor_deducir for f in facts), 2)
 
+    ult_dia_mes = monthrange(periodo_inicio.year, periodo_inicio.month)[1]
+    mes_inicio = date(periodo_inicio.year, periodo_inicio.month, 1)
+    mes_fin = date(periodo_inicio.year, periodo_inicio.month, ult_dia_mes)
     cads = (
         sess.query(DeduccionCadena)
         .filter(
             DeduccionCadena.empleado_id == empleado.id,
             DeduccionCadena.liquidacion_id.is_(None),
-            func.strftime("%Y-%m", DeduccionCadena.fecha) == periodo_inicio.strftime("%Y-%m"),
+            DeduccionCadena.fecha >= mes_inicio,
+            DeduccionCadena.fecha <= mes_fin,
         )
         .all()
     )
