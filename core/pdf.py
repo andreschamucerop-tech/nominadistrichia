@@ -175,7 +175,7 @@ def _flowables_real(
     if r.domicilios > 0:
         deveng.append(["Domicilios", _fmt(r.domicilios)])
     if r.bonificacion > 0:
-        deveng.append(["Bonificación", _fmt(r.bonificacion)])
+        deveng.append(["Bonificación por ventas (no constitutivo de salario)", _fmt(r.bonificacion)])
     deveng.append(["Total devengado", _fmt(r.devengado_real)])
     el.append(_tabla_concepto_valor(deveng, styles))
     el.append(Spacer(1, 0.3 * cm))
@@ -186,7 +186,7 @@ def _flowables_real(
     dedu.append([f"Pensión 4% (base quincena {_fmt(base_q)})", _fmt(r.pension_real)])
     if r.facturas_total > 0:
         dedu.append([
-            f"Facturas (fiado, {len(r.facturas)} ítems con 10% dcto)",
+            f"Facturas ({len(r.facturas)} ítems con 10% dcto)",
             _fmt(r.facturas_total),
         ])
     if r.cadena_total > 0:
