@@ -59,25 +59,6 @@ def _crear_engine():
         pass
 
     if db_url:
-        # Imprimir host/usuario para diagnóstico (sin password)
-        try:
-            _p = urlparse(db_url)
-            print(f"[DB] Conectando a PostgreSQL: {_p.scheme}://{_p.username}@{_p.hostname}:{_p.port}{_p.path}")
-        except Exception:
-            pass
-        try:
-            import psycopg2
-            _p = urlparse(db_url)
-            psycopg2.connect(
-                host=_p.hostname, port=_p.port, dbname=_p.path.lstrip("/"),
-                user=_p.username, password=unquote(_p.password or ""),
-                sslmode="require", connect_timeout=10,
-            ).close()
-            print("[DB] Conexión de prueba exitosa.")
-        except Exception as e:
-            print(f"[DB] ERROR psycopg2: {e}")
-            raise RuntimeError(f"No se pudo conectar a la base de datos: {e}") from e
-
         return create_engine(
             db_url,
             echo=False,
@@ -89,7 +70,6 @@ def _crear_engine():
         )
 
     # ── Fallback: SQLite local ────────────────────────────────────────────────
-    print("[DB] Usando SQLite local (no se encontró db_url de Supabase).")
     return create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
 
 
