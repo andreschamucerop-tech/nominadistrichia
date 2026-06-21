@@ -79,18 +79,7 @@ try:
 
     @st.cache_resource
     def _get_engine():
-        engine = _crear_engine()
-        # Prueba la conexión para mostrar el error real en pantalla si falla
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-        except Exception as e:
-            st.error(
-                f"**Error de conexión a la base de datos:**\n\n"
-                f"`{type(e).__name__}: {e}`"
-            )
-            raise
-        return engine
+        return _crear_engine()
 
 except ImportError:
     def _get_engine():  # type: ignore[misc]
