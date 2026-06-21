@@ -16,6 +16,7 @@ from sqlalchemy import (
     String, Time, create_engine, text,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.pool import NullPool, StaticPool
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -63,14 +64,18 @@ def _crear_engine():
             db_url,
             echo=False,
             future=True,
-            pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=10,
+            poolclass=NullPool,
             connect_args={"sslmode": "require"},
         )
 
     # ── Fallback: SQLite local ────────────────────────────────────────────────
-    return create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
+    return create_engine(
+        f"sqlite:///{DB_PATH}",
+        echo=False,
+        future=True,
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
 
 
 try:
