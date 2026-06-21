@@ -9,12 +9,13 @@ from __future__ import annotations
 from datetime import date, datetime
 from pathlib import Path
 
-from urllib.parse import quote, unquote, urlparse, urlunparse
+from urllib.parse import unquote, urlparse
 
 from sqlalchemy import (
     Boolean, Column, Date, DateTime, Float, ForeignKey, Integer,
     String, Time, create_engine, text,
 )
+from sqlalchemy.engine import URL as SA_URL
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
@@ -29,39 +30,34 @@ DB_PATH = DATA_DIR / "nomina.db"
 Base = declarative_base()
 
 
-def _encode_db_url(url: str) -> str:
-    """Re-codifica el password en la URL para manejar caracteres especiales como & y !."""
-    parsed = urlparse(url)
-    if not parsed.password:
-        return url
-    password = quote(unquote(parsed.password), safe="")
-    username = quote(unquote(parsed.username or ""), safe=".")
-    port_part = f":{parsed.port}" if parsed.port else ""
-    netloc = f"{username}:{password}@{parsed.hostname}{port_part}"
-    return urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
-
-
 def _crear_engine():
     """Devuelve el engine correcto según los secrets disponibles.
 
-    Prioridad:
-    1. PostgreSQL (Supabase) si secrets.toml contiene [supabase] db_url válida.
-    2. SQLite local como fallback (desarrollo / sin conexión).
+    Usa SA_URL.create() para pasar el password directamente a psycopg2
+    sin pasar por encoding/decoding de URL, evitando problemas con
+    caracteres especiales como & y ! en la contraseña.
     """
-    db_url: str | None = None
+    sa_url = None
     try:
         import streamlit as st
-        # Acceso directo al atributo para evitar problemas con AttrDict de Streamlit
         supabase_secrets = st.secrets["supabase"]
         raw = supabase_secrets["db_url"]
         if raw and "[TU-PASSWORD]" not in raw and raw.startswith("postgresql"):
-            db_url = _encode_db_url(raw)
+            p = urlparse(raw)
+            sa_url = SA_URL.create(
+                drivername="postgresql+psycopg2",
+                username=p.username,
+                password=unquote(p.password or ""),
+                host=p.hostname,
+                port=p.port,
+                database=p.path.lstrip("/"),
+            )
     except Exception:
         pass
 
-    if db_url:
+    if sa_url:
         return create_engine(
-            db_url,
+            sa_url,
             echo=False,
             future=True,
             poolclass=NullPool,
