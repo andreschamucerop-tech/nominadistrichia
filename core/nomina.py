@@ -182,6 +182,8 @@ def liquidar(
         .filter(
             FacturaQuincena.empleado_id == empleado.id,
             FacturaQuincena.liquidacion_id.is_(None),
+            FacturaQuincena.fecha >= periodo_inicio,
+            FacturaQuincena.fecha <= periodo_fin,
         )
         .all()
     )
@@ -209,6 +211,8 @@ def liquidar(
         .filter(
             PrestamoQuincena.empleado_id == empleado.id,
             PrestamoQuincena.liquidacion_id.is_(None),
+            PrestamoQuincena.fecha >= periodo_inicio,
+            PrestamoQuincena.fecha <= periodo_fin,
         )
         .all()
     )
