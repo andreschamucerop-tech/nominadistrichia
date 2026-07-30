@@ -1,7 +1,7 @@
 """Cálculo simplificado de horas trabajadas.
 
-Reglas (NO normatividad colombiana):
-  - Jornada diaria = 7h 20min (7.333h). Lo que exceda es extra.
+Reglas (normatividad colombiana vigente desde 15-Jul-2026):
+  - Jornada diaria = 7h. Lo que exceda es extra.
   - Recargo nocturno aplica desde las 19:00 hasta las 06:00 del día siguiente.
   - El recargo nocturno es ADICIONAL: una hora extra trabajada de 7pm a 8pm
     cuenta como 1h extra + 1h nocturna (paga ambos conceptos).
@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-JORNADA_DIARIA_HORAS = 22 / 3  # 7h 20min = 7.3333…
+JORNADA_DIARIA_HORAS = 7.0  # 7h exactas (Ley 2101/2021, vigente desde 15-Jul-2026)
 NOCTURNO_INICIO = time(19, 0)
 NOCTURNO_FIN = time(6, 0)
 
