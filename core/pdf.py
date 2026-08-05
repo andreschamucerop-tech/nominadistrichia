@@ -193,6 +193,11 @@ def _flowables_real(
         dedu.append([f"Cadena ({len(r.cadenas)} aporte/s)", _fmt(r.cadena_total)])
     if r.prestamos_total > 0:
         dedu.append([f"Préstamos ({len(r.prestamos)} cuota/s)", _fmt(r.prestamos_total)])
+    if r.permisos_dias > 0:
+        dedu.append([
+            f"Permiso no remunerado ({r.permisos_dias} día/s)",
+            _fmt(r.permisos_descuento),
+        ])
     dedu.append(["Total deducciones", _fmt(r.deducciones_real)])
     el.append(_tabla_concepto_valor(dedu, styles))
     el.append(Spacer(1, 0.3 * cm))

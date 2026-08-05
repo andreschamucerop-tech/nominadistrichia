@@ -194,6 +194,15 @@ class PrestamoQuincena(Base):
     descripcion = Column(String(200), default="")
 
 
+class PermisoNoRemunerado(Base):
+    __tablename__ = "permiso_no_remunerado"
+    id = Column(Integer, primary_key=True)
+    empleado_id = Column(Integer, ForeignKey("empleado.id"), nullable=False)
+    liquidacion_id = Column(Integer, ForeignKey("liquidacion_quincena.id"), nullable=True)
+    fecha = Column(Date, nullable=False, default=date.today)
+    descripcion = Column(String(200), default="")
+
+
 class LiquidacionQuincena(Base):
     __tablename__ = "liquidacion_quincena"
     id = Column(Integer, primary_key=True)

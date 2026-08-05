@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from core.db import (
     DeduccionCadena, Empleado, Empresa, FacturaQuincena,
-    HorasCalculadas, Marcacion, PrestamoQuincena,
+    HorasCalculadas, Marcacion, PermisoNoRemunerado, PrestamoQuincena,
 )
 
 
@@ -50,10 +50,14 @@ class ResumenLiquidacion:
     deducciones_min: float = 0.0
     neto_min: float = 0.0
 
+    permisos_dias: int = 0
+    permisos_descuento: float = 0.0
+
     # Detalle bruto
     facturas: list = field(default_factory=list)
     cadenas: list = field(default_factory=list)
     prestamos: list = field(default_factory=list)
+    permisos: list = field(default_factory=list)
 
 
 def _festivos_col(year: int) -> set[date]:
@@ -219,9 +223,25 @@ def liquidar(
     r.prestamos = list(prest)
     r.prestamos_total = round(sum(p.valor for p in prest), 2)
 
+    perms = (
+        sess.query(PermisoNoRemunerado)
+        .filter(
+            PermisoNoRemunerado.empleado_id == empleado.id,
+            PermisoNoRemunerado.liquidacion_id.is_(None),
+            PermisoNoRemunerado.fecha >= periodo_inicio,
+            PermisoNoRemunerado.fecha <= periodo_fin,
+        )
+        .all()
+    )
+    r.permisos = list(perms)
+    r.permisos_dias = len(perms)
+    r.permisos_descuento = round(
+        (empleado.salario_base / 30 + empresa.auxilio_transporte / 30) * r.permisos_dias, 2,
+    )
+
     r.deducciones_real = round(
         r.salud_real + r.pension_real + r.facturas_total
-        + r.cadena_total + r.prestamos_total, 2,
+        + r.cadena_total + r.prestamos_total + r.permisos_descuento, 2,
     )
     r.neto_real = round(r.devengado_real - r.deducciones_real, 2)
 

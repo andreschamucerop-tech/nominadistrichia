@@ -7,8 +7,8 @@ import streamlit as st
 
 from core.auth import requerir_login
 from core.db import (
-    DeduccionCadena, Empleado, FacturaQuincena, PrestamoQuincena,
-    get_session, init_db,
+    DeduccionCadena, Empleado, FacturaQuincena, PermisoNoRemunerado,
+    PrestamoQuincena, get_session, init_db,
 )
 from core.ui import peso_input
 
@@ -34,7 +34,7 @@ emp_id = int(
 st.subheader("Registrar deducción")
 concepto = st.selectbox(
     "Concepto",
-    ["Factura (fiado, 10% descuento)", "Cadena", "Préstamo"],
+    ["Factura (fiado, 10% descuento)", "Cadena", "Préstamo", "Permiso no remunerado"],
 )
 
 with st.form("form_deduccion"):
@@ -84,7 +84,7 @@ with st.form("form_deduccion"):
                 )
                 st.rerun()
 
-    else:  # Préstamo
+    elif concepto == "Préstamo":
         c1, c2, c3 = st.columns(3)
         with c1:
             fecha_prest = st.date_input("Fecha", value=date.today())
@@ -107,6 +107,25 @@ with st.form("form_deduccion"):
                     f"{fecha_prest.strftime('%d/%m/%Y')}."
                 )
                 st.rerun()
+
+    else:  # Permiso no remunerado
+        st.info(
+            "Registra cada día de permiso por separado con su fecha. "
+            "El descuento se calcula automáticamente al liquidar."
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            fecha_perm = st.date_input("Fecha del día de permiso", value=date.today())
+        with c2:
+            desc_perm = st.text_input("Descripción (opcional)")
+        if st.form_submit_button("Registrar", type="primary"):
+            with get_session() as s:
+                s.add(PermisoNoRemunerado(
+                    empleado_id=emp_id, fecha=fecha_perm, descripcion=desc_perm,
+                ))
+                s.commit()
+            st.success(f"Permiso no remunerado registrado para {fecha_perm.strftime('%d/%m/%Y')}.")
+            st.rerun()
 
 # ── Lista de pendientes con acciones ─────────────────────────────────────────
 st.divider()
@@ -132,6 +151,13 @@ with get_session() as s:
         .filter(PrestamoQuincena.empleado_id == emp_id,
                 PrestamoQuincena.liquidacion_id.is_(None))
         .order_by(PrestamoQuincena.fecha.desc())
+        .all()
+    )
+    perms = (
+        s.query(PermisoNoRemunerado)
+        .filter(PermisoNoRemunerado.empleado_id == emp_id,
+                PermisoNoRemunerado.liquidacion_id.is_(None))
+        .order_by(PermisoNoRemunerado.fecha.desc())
         .all()
     )
 
@@ -166,6 +192,16 @@ for p in prests:
         "A deducir": p.valor,
         "Descripción": p.descripcion or "",
     })
+for pm in perms:
+    registros.append({
+        "_tipo": "permiso", "_id": pm.id,
+        "Tipo": "Permiso NR",
+        "Ref.": pm.fecha.strftime("%d/%m/%Y"),
+        "Valor": 0.0,
+        "Dcto 10%": 0.0,
+        "A deducir": 0.0,
+        "Descripción": pm.descripcion or "",
+    })
 
 if not registros:
     st.info("Sin deducciones pendientes para este empleado.")
@@ -196,6 +232,8 @@ else:
                     obj = s.get(FacturaQuincena, reg["_id"])
                 elif reg["_tipo"] == "cadena":
                     obj = s.get(DeduccionCadena, reg["_id"])
+                elif reg["_tipo"] == "permiso":
+                    obj = s.get(PermisoNoRemunerado, reg["_id"])
                 else:
                     obj = s.get(PrestamoQuincena, reg["_id"])
                 if obj:

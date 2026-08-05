@@ -132,6 +132,7 @@ with tab_calc:
             "Facturas": f"${r.facturas_total:,.0f}",
             "Cadena": f"${r.cadena_total:,.0f}",
             "Préstamos": f"${r.prestamos_total:,.0f}",
+            "Permisos no remunerados": f"{r.permisos_dias} día/s → -${r.permisos_descuento:,.0f}",
             "DEDUCCIONES": f"${r.deducciones_real:,.0f}",
             "NETO REAL": f"${r.neto_real:,.0f}",
         })
