@@ -1,10 +1,12 @@
 """Liquidación quincenal con generación de PDF combinado por empleado."""
 from __future__ import annotations
 
+import base64
 from calendar import monthrange
 from datetime import date
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from core.auth import requerir_login
 from core.db import (
@@ -58,6 +60,30 @@ st.info(f"Periodo: **{periodo_inicio} → {periodo_fin}**")
 tab_calc, tab_hist = st.tabs(["Calcular liquidación", "Historial"])
 
 with tab_calc:
+    # ── Descarga automática tras confirmar ────────────────────────────────────
+    if "_pdf_listo" in st.session_state:
+        pdf_data = st.session_state.pop("_pdf_listo")
+        st.success(f"Liquidación #{pdf_data['liq_id']} guardada.")
+        b64 = base64.b64encode(pdf_data["bytes"]).decode()
+        fname = pdf_data["filename"]
+        components.html(
+            f"""<script>
+            const a = document.createElement('a');
+            a.href = 'data:application/pdf;base64,{b64}';
+            a.download = '{fname}';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            </script>""",
+            height=0,
+        )
+        st.download_button(
+            "⬇️ Descargar desprendible (PDF) — si no inició automáticamente",
+            pdf_data["bytes"],
+            file_name=fname,
+            mime="application/pdf",
+        )
+
     sel = st.selectbox(
         "Empleado", [f"{e.id} — {e.nombres}" for e in empleados],
     )
@@ -201,15 +227,15 @@ with tab_calc:
                 liq_id = liq.id
                 path_final = liq.pdf_real_path
 
-            st.success(f"Liquidación #{liq_id} guardada.")
             with open(path_final, "rb") as fh:
-                st.download_button(
-                    "⬇️ Descargar desprendible (PDF)",
-                    fh.read(),
-                    file_name=path_final.split("/")[-1],
-                    mime="application/pdf",
-                )
+                pdf_bytes = fh.read()
+            st.session_state["_pdf_listo"] = {
+                "bytes": pdf_bytes,
+                "filename": path_final.split("/")[-1],
+                "liq_id": liq_id,
+            }
             st.session_state.pop("_liq_pendiente", None)
+            st.rerun()
 
 
 with tab_hist:
