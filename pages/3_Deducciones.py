@@ -109,23 +109,50 @@ with st.form("form_deduccion"):
                 st.rerun()
 
     else:  # Permiso no remunerado
-        st.info(
-            "Registra cada día de permiso por separado con su fecha. "
-            "El descuento se calcula automáticamente al liquidar."
-        )
-        c1, c2 = st.columns(2)
-        with c1:
-            fecha_perm = st.date_input("Fecha del día de permiso", value=date.today())
-        with c2:
-            desc_perm = st.text_input("Descripción (opcional)")
-        if st.form_submit_button("Registrar", type="primary"):
-            with get_session() as s:
-                s.add(PermisoNoRemunerado(
-                    empleado_id=emp_id, fecha=fecha_perm, descripcion=desc_perm,
-                ))
-                s.commit()
-            st.success(f"Permiso no remunerado registrado para {fecha_perm.strftime('%d/%m/%Y')}.")
-            st.rerun()
+        st.info("El descuento se calcula automáticamente al liquidar: (salario + auxilio) / 30 × días.")
+        modo_perm = st.radio("Modo de registro", ["Día único", "Rango de fechas"], horizontal=True)
+        if modo_perm == "Día único":
+            c1, c2 = st.columns(2)
+            with c1:
+                fecha_perm = st.date_input("Fecha del día de permiso", value=date.today())
+            with c2:
+                desc_perm = st.text_input("Descripción (opcional)")
+            if st.form_submit_button("Registrar", type="primary"):
+                with get_session() as s:
+                    s.add(PermisoNoRemunerado(
+                        empleado_id=emp_id, fecha=fecha_perm, descripcion=desc_perm,
+                    ))
+                    s.commit()
+                st.success(f"Permiso registrado: {fecha_perm.strftime('%d/%m/%Y')}.")
+                st.rerun()
+        else:  # Rango de fechas
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                fecha_ini_perm = st.date_input("Fecha inicio", value=date.today(), key="perm_ini")
+            with c2:
+                fecha_fin_perm = st.date_input("Fecha fin", value=date.today(), key="perm_fin")
+            with c3:
+                desc_perm_r = st.text_input("Descripción (opcional)", key="perm_desc")
+            if st.form_submit_button("Registrar rango", type="primary"):
+                if fecha_fin_perm < fecha_ini_perm:
+                    st.error("La fecha fin debe ser igual o posterior a la fecha inicio.")
+                else:
+                    from datetime import timedelta
+                    dias = (fecha_fin_perm - fecha_ini_perm).days + 1
+                    with get_session() as s:
+                        for i in range(dias):
+                            s.add(PermisoNoRemunerado(
+                                empleado_id=emp_id,
+                                fecha=fecha_ini_perm + timedelta(days=i),
+                                descripcion=desc_perm_r,
+                            ))
+                        s.commit()
+                    st.success(
+                        f"{dias} día/s de permiso registrados: "
+                        f"{fecha_ini_perm.strftime('%d/%m/%Y')} al "
+                        f"{fecha_fin_perm.strftime('%d/%m/%Y')}."
+                    )
+                    st.rerun()
 
 # ── Lista de pendientes con acciones ─────────────────────────────────────────
 st.divider()
