@@ -153,8 +153,11 @@ def _flowables_real(
     )
 
     deveng = [["Devengado", "Valor"]]
-    deveng.append(["Salario (15 días)", _fmt(r.salario_proporcional)])
-    deveng.append(["Auxilio de transporte (15 días)", _fmt(r.aux_transporte_real)])
+    deveng.append([f"Salario ({r.dias_laborados} días)", _fmt(r.salario_proporcional)])
+    deveng.append([
+        f"Auxilio de transporte ({r.dias_laborados} días)",
+        _fmt(r.aux_transporte_real),
+    ])
     if r.h_ext > 0:
         deveng.append([
             f"Horas extras ({r.h_ext:.2f} h × {_fmt(empresa.valor_hora_extra)})",
@@ -181,9 +184,9 @@ def _flowables_real(
     el.append(Spacer(1, 0.3 * cm))
 
     dedu = [["Deducciones", "Valor"]]
-    base_q = round(empresa.smmlv / 2, 0)
-    dedu.append([f"Salud 4% (base quincena {_fmt(base_q)})", _fmt(r.salud_real)])
-    dedu.append([f"Pensión 4% (base quincena {_fmt(base_q)})", _fmt(r.pension_real)])
+    base_q = round(empresa.smmlv / 30.0 * r.dias_laborados, 0)
+    dedu.append([f"Salud 4% (base {_fmt(base_q)})", _fmt(r.salud_real)])
+    dedu.append([f"Pensión 4% (base {_fmt(base_q)})", _fmt(r.pension_real)])
     if r.facturas_total > 0:
         dedu.append([
             f"Facturas ({len(r.facturas)} ítems con 10% dcto)",
@@ -230,8 +233,13 @@ def _flowables_minimo(
     )
 
     deveng = [["Devengado", "Valor"]]
-    deveng.append(["Salario mínimo (15 días)", _fmt(r.smmlv_proporcional)])
-    deveng.append(["Auxilio de transporte (15 días)", _fmt(r.aux_transporte_proporcional)])
+    deveng.append([
+        f"Salario mínimo ({r.dias_laborados} días)", _fmt(r.smmlv_proporcional),
+    ])
+    deveng.append([
+        f"Auxilio de transporte ({r.dias_laborados} días)",
+        _fmt(r.aux_transporte_proporcional),
+    ])
     deveng.append(["Total devengado", _fmt(r.devengado_min)])
     el.append(_tabla_concepto_valor(deveng, styles))
     el.append(Spacer(1, 0.3 * cm))

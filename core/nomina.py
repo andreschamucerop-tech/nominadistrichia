@@ -17,6 +17,7 @@ from core.db import (
 class ResumenLiquidacion:
     # Datos base
     dias_periodo: int = 0       # días calendario del periodo (incl. descansos)
+    dias_laborados: int = 0     # días del periodo cubiertos por el contrato (según fecha_ingreso/retiro)
     dias_trabajados: int = 0    # días con marcación (informativo)
     h_ord: float = 0.0
     h_ext: float = 0.0
@@ -142,6 +143,23 @@ def liquidar(
     r = ResumenLiquidacion(bonificacion=bonificacion, domicilios=domicilios)
     r.dias_periodo = (periodo_fin - periodo_inicio).days + 1
 
+    # Días del periodo efectivamente cubiertos por el contrato del empleado,
+    # según su fecha de ingreso y (si aplica) fecha de retiro. Se usa el
+    # criterio comercial de mes de 30 días (el día 31 no cuenta aparte),
+    # consistente con que cada quincena siempre equivale a 15/30 días.
+    inicio_efectivo = max(periodo_inicio, empleado.fecha_ingreso)
+    fin_efectivo = (
+        min(periodo_fin, empleado.fecha_retiro)
+        if empleado.fecha_retiro
+        else periodo_fin
+    )
+    if fin_efectivo >= inicio_efectivo:
+        dia_ini = inicio_efectivo.day
+        dia_fin = 30 if fin_efectivo.day > 30 else fin_efectivo.day
+        r.dias_laborados = max(0, dia_fin - dia_ini + 1)
+    else:
+        r.dias_laborados = 0
+
     marcs = (
         sess.query(Marcacion, HorasCalculadas)
         .join(HorasCalculadas, HorasCalculadas.marcacion_id == Marcacion.id)
@@ -163,9 +181,14 @@ def liquidar(
     )
 
     # === PDF real ===
-    # Salario y auxilio siempre sobre 15 días fijos (mes = 30 días, quincena = 15).
-    r.salario_proporcional = round(empleado.salario_base / 2.0, 2)
-    r.aux_transporte_real = round(empresa.auxilio_transporte / 2.0, 2)
+    # Salario y auxilio proporcionales a los días realmente cubiertos por el
+    # contrato dentro del periodo (mes = 30 días), no siempre 15 días fijos.
+    r.salario_proporcional = round(
+        empleado.salario_base / 30.0 * r.dias_laborados, 2,
+    )
+    r.aux_transporte_real = round(
+        empresa.auxilio_transporte / 30.0 * r.dias_laborados, 2,
+    )
     r.valor_extras = round(r.h_ext * empresa.valor_hora_extra, 2)
     r.valor_nocturnas = round(r.h_noct * empresa.valor_recargo_nocturno_hora, 2)
     r.valor_dominicales = round(
@@ -176,8 +199,8 @@ def liquidar(
         + r.valor_nocturnas + r.valor_dominicales + r.bonificacion + r.domicilios, 2,
     )
 
-    # Deducciones sobre SMMLV × 15/30 por quincena (no sobre devengado).
-    base_deduccion = round(empresa.smmlv / 2.0, 2)
+    # Deducciones sobre SMMLV proporcional a los días laborados (no sobre devengado).
+    base_deduccion = round(empresa.smmlv / 30.0 * r.dias_laborados, 2)
     r.salud_real = round(base_deduccion * 0.04, 2)
     r.pension_real = round(base_deduccion * 0.04, 2)
 
@@ -246,8 +269,10 @@ def liquidar(
     r.neto_real = round(r.devengado_real - r.deducciones_real, 2)
 
     # === PDF mínimo (como si ganara solo SMMLV) ===
-    r.smmlv_proporcional = round(empresa.smmlv / 2.0, 2)
-    r.aux_transporte_proporcional = round(empresa.auxilio_transporte / 2.0, 2)
+    r.smmlv_proporcional = round(empresa.smmlv / 30.0 * r.dias_laborados, 2)
+    r.aux_transporte_proporcional = round(
+        empresa.auxilio_transporte / 30.0 * r.dias_laborados, 2,
+    )
     r.devengado_min = round(
         r.smmlv_proporcional + r.aux_transporte_proporcional, 2,
     )

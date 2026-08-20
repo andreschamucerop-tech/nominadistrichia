@@ -140,6 +140,7 @@ with tab_calc:
         st.subheader("Resumen — Liquidación real")
         st.write({
             "Días del periodo": r.dias_periodo,
+            "Días laborados (según ingreso/retiro)": r.dias_laborados,
             "Días con marcación": r.dias_trabajados,
             "Horas ordinarias": r.h_ord,
             "Horas extras": r.h_ext,
