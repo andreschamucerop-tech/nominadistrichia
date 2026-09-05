@@ -71,12 +71,15 @@ def _contar_dominicales(
 ) -> int:
     """Cuenta dominicales asignados a la quincena.
 
-    Se itera por cada semana (lun-dom) cuyo DOMINGO cae dentro del rango.
-    "Días especiales" de la semana = domingo + festivos colombianos de ese período.
+    Se itera por cada domingo dentro del rango [ini, fin]. Los "días
+    especiales" (domingo + festivos colombianos) y los días trabajados se
+    restringen estrictamente a la quincena que se está liquidando — no se
+    consulta ni se tiene en cuenta información de días fuera del periodo,
+    aunque pertenezcan a la misma semana calendario.
 
-      - Sin días trabajados esa semana → no cuenta.
-      - Trabajó todos los días especiales (sin descanso en festivo/dom) → 2 dom.
-      - Descansó al menos 1 día especial → 1 dominical.
+      - Sin días trabajados esa semana (dentro del periodo) → no cuenta.
+      - Trabajó todos los días especiales del periodo (sin descanso) → 2 dom.
+      - Descansó al menos 1 día especial del periodo → 1 dominical.
     """
     total = 0
     d = ini
@@ -84,6 +87,8 @@ def _contar_dominicales(
         if d.weekday() == 6:  # domingo
             lunes = d - timedelta(days=6)
             domingo = d
+            lunes_periodo = max(lunes, ini)
+            domingo_periodo = min(domingo, fin)
 
             # Festivos colombianos para los años que toca la semana
             años = {lunes.year, domingo.year}
@@ -91,21 +96,22 @@ def _contar_dominicales(
             for y in años:
                 festivos |= _festivos_col(y)
 
-            # Días especiales de la semana (domingo + festivos lun-sáb)
+            # Días especiales de la semana (domingo + festivos lun-sáb),
+            # restringidos a los que caen dentro de la quincena.
             dias_especiales: set[date] = set()
-            cur = lunes
-            while cur <= domingo:
+            cur = lunes_periodo
+            while cur <= domingo_periodo:
                 if cur.weekday() == 6 or cur in festivos:
                     dias_especiales.add(cur)
                 cur += timedelta(days=1)
 
-            # Días trabajados en esa semana
+            # Días trabajados dentro de la quincena, en esa semana
             rows = (
                 sess.query(Marcacion.fecha)
                 .filter(
                     Marcacion.empleado_id == empleado_id,
-                    Marcacion.fecha >= lunes,
-                    Marcacion.fecha <= domingo,
+                    Marcacion.fecha >= lunes_periodo,
+                    Marcacion.fecha <= domingo_periodo,
                 )
                 .all()
             )
@@ -115,7 +121,7 @@ def _contar_dominicales(
                 d += timedelta(days=1)
                 continue
 
-            # ¿Descansó algún día especial?
+            # ¿Descansó algún día especial (dentro del periodo)?
             descanso_especial = dias_especiales - trabajados
             if descanso_especial:
                 total += 1   # tuvo al menos 1 día de descanso especial
