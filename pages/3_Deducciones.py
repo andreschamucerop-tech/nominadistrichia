@@ -191,7 +191,7 @@ with get_session() as s:
 registros = []
 for f in facts:
     registros.append({
-        "_tipo": "factura", "_id": f.id,
+        "_tipo": "factura", "_id": f.id, "_fecha": f.fecha,
         "Tipo": "Factura",
         "Ref.": f.fecha.strftime("%d/%m/%Y"),
         "Valor": f.valor_factura,
@@ -201,7 +201,7 @@ for f in facts:
     })
 for c in cads:
     registros.append({
-        "_tipo": "cadena", "_id": c.id,
+        "_tipo": "cadena", "_id": c.id, "_fecha": c.fecha or date.min,
         "Tipo": "Cadena",
         "Ref.": c.fecha.strftime("%d/%m/%Y") if c.fecha else "—",
         "Valor": c.valor,
@@ -211,7 +211,7 @@ for c in cads:
     })
 for p in prests:
     registros.append({
-        "_tipo": "prestamo", "_id": p.id,
+        "_tipo": "prestamo", "_id": p.id, "_fecha": p.fecha,
         "Tipo": "Préstamo",
         "Ref.": p.fecha.strftime("%d/%m/%Y"),
         "Valor": p.valor,
@@ -221,7 +221,7 @@ for p in prests:
     })
 for pm in perms:
     registros.append({
-        "_tipo": "permiso", "_id": pm.id,
+        "_tipo": "permiso", "_id": pm.id, "_fecha": pm.fecha,
         "Tipo": "Permiso NR",
         "Ref.": pm.fecha.strftime("%d/%m/%Y"),
         "Valor": 0.0,
@@ -229,6 +229,8 @@ for pm in perms:
         "A deducir": 0.0,
         "Descripción": pm.descripcion or "",
     })
+
+registros.sort(key=lambda r: r["_fecha"], reverse=True)
 
 if not registros:
     st.info("Sin deducciones pendientes para este empleado.")
