@@ -49,6 +49,7 @@ with tab_lista:
                 "Cargo": e.cargo,
                 "Salario": f"${e.salario_base:,.0f}",
                 "Ingreso": e.fecha_ingreso,
+                "Retiro": e.fecha_retiro,
                 "Estado": "Activo" if e.activo else "Inactivo",
             }
             for e in empleados
@@ -93,6 +94,10 @@ with tab_nuevo:
                 "Fecha de ingreso",
                 value=datos.fecha_ingreso if datos else date.today(),
             )
+            f_ret = st.date_input(
+                "Fecha de retiro (dejar vacío si sigue activo)",
+                value=datos.fecha_retiro if datos else None,
+            )
             activo = st.checkbox(
                 "Activo", value=datos.activo if datos else True,
             )
@@ -101,6 +106,8 @@ with tab_nuevo:
     if ok:
         if not cedula or not nombres:
             st.error("Documento y nombres son obligatorios.")
+        elif f_ret and f_ret < f_ing:
+            st.error("La fecha de retiro no puede ser anterior a la fecha de ingreso.")
         else:
             with get_session() as s:
                 if edit_id:
@@ -117,6 +124,7 @@ with tab_nuevo:
                 e.cargo = cargo
                 e.salario_base = float(salario)
                 e.fecha_ingreso = f_ing
+                e.fecha_retiro = f_ret
                 e.activo = activo
                 s.commit()
             st.success("Empleado guardado.")
