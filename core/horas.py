@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
 JORNADA_DIARIA_HORAS = 7.0  # 7h exactas (Ley 2101/2021, vigente desde 15-Jul-2026)
+JORNADA_SEMANAL_HORAS = 42.0  # tope semanal (Ley 2101/2021, vigente desde 15-Jul-2026)
 NOCTURNO_INICIO = time(19, 0)
 NOCTURNO_FIN = time(6, 0)
 

@@ -11,6 +11,7 @@ from core.db import (
     DeduccionCadena, Empleado, Empresa, FacturaQuincena,
     HorasCalculadas, Marcacion, PermisoNoRemunerado, PrestamoQuincena,
 )
+from core.horas import JORNADA_SEMANAL_HORAS
 
 
 @dataclass
@@ -125,6 +126,59 @@ def _contar_dominicales(
     return total
 
 
+def _horas_semana_ajustadas(
+    sess: Session, empleado_id: int, periodo_inicio: date, periodo_fin: date,
+) -> tuple[float, float]:
+    """Recalcula ordinarias/extras del periodo aplicando también el tope
+    semanal de 42h (además del tope diario de 7h ya aplicado en
+    HorasCalculadas).
+
+    Se recorre cada semana completa (lun-dom) que toca el periodo, aunque
+    se salga de él, para que el corte de quincena no altere el resultado
+    semanal real (igual criterio que _contar_dominicales). Las horas
+    "ordinarias" diarias (ya topadas a 7h/día) se acumulan por semana; lo
+    que exceda de 42h se reclasifica como extra.
+    """
+    ini_semana = periodo_inicio - timedelta(days=periodo_inicio.weekday())
+    fin_semana = periodo_fin + timedelta(days=6 - periodo_fin.weekday())
+
+    filas = (
+        sess.query(
+            Marcacion.fecha, HorasCalculadas.h_ordinarias, HorasCalculadas.h_extras,
+        )
+        .join(HorasCalculadas, HorasCalculadas.marcacion_id == Marcacion.id)
+        .filter(
+            Marcacion.empleado_id == empleado_id,
+            Marcacion.fecha >= ini_semana,
+            Marcacion.fecha <= fin_semana,
+        )
+        .order_by(Marcacion.fecha)
+        .all()
+    )
+
+    h_ord_total = 0.0
+    h_ext_total = 0.0
+    acumulado_ord = 0.0
+    semana_actual: date | None = None
+    for fecha, ord_dia, ext_dia in filas:
+        inicio_semana_fecha = fecha - timedelta(days=fecha.weekday())
+        if inicio_semana_fecha != semana_actual:
+            semana_actual = inicio_semana_fecha
+            acumulado_ord = 0.0
+
+        ord_dia = ord_dia or 0.0
+        ext_dia = ext_dia or 0.0
+        ord_permitida = max(0.0, min(ord_dia, JORNADA_SEMANAL_HORAS - acumulado_ord))
+        excedente = ord_dia - ord_permitida
+        acumulado_ord += ord_permitida
+
+        if periodo_inicio <= fecha <= periodo_fin:
+            h_ord_total += ord_permitida
+            h_ext_total += ext_dia + excedente
+
+    return round(h_ord_total, 2), round(h_ext_total, 2)
+
+
 def liquidar(
     sess: Session,
     empleado: Empleado,
@@ -171,8 +225,9 @@ def liquidar(
         .all()
     )
     r.dias_trabajados = len({m.fecha for m, _ in marcs})
-    r.h_ord = round(sum(h.h_ordinarias for _, h in marcs), 2)
-    r.h_ext = round(sum(h.h_extras for _, h in marcs), 2)
+    r.h_ord, r.h_ext = _horas_semana_ajustadas(
+        sess, empleado.id, periodo_inicio, periodo_fin,
+    )
     r.h_noct = round(sum(h.h_nocturnas for _, h in marcs), 2)
     r.dominicales = (
         dominicales_override
