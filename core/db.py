@@ -297,7 +297,7 @@ def get_session():
             s.query(...)
     """
     Session = _session_factory()
-    session = Session
+    session = Session()  # instanciar la sesión
     try:
         yield session
         session.commit()
