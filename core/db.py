@@ -95,7 +95,13 @@ def _engine():
 
 
 def _session_factory():
-    return sessionmaker(bind=_engine(), autoflush=False, autocommit=False, future=True)
+    return sessionmaker(
+        bind=_engine(),
+        autoflush=False,
+        autocommit=False,
+        future=True,
+        expire_on_commit=False,   # los atributos cargados siguen accesibles tras cerrar la sesión
+    )
 
 
 class Admin(Base):
