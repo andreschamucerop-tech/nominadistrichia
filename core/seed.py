@@ -29,7 +29,7 @@ def seed_inicial() -> str | None:
             pwd_generada = secrets.token_urlsafe(10)
             h = bcrypt.hashpw(pwd_generada.encode(), bcrypt.gensalt()).decode()
             s.add(Admin(usuario="admin", password_hash=h))
-        s.commit()
+        # commit lo hace el context manager automáticamente
     return pwd_generada
 
 

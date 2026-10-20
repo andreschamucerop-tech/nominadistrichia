@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+from io import BytesIO
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -282,7 +283,7 @@ def generar_pdf_combinado(
     periodo_ini: date, periodo_fin: date,
     resumen: ResumenLiquidacion,
 ) -> str:
-    """PDF de 2 páginas: real + mínimo, con marca de agua del logo."""
+    """PDF de 2 páginas: real + mínimo, con marca de agua del logo. Guarda en disco."""
     styles = _estilos()
     path = Path(PDF_DIR) / _nombre(empleado.nombres, periodo_ini, periodo_fin)
     doc = SimpleDocTemplate(
@@ -295,3 +296,27 @@ def generar_pdf_combinado(
     flow.extend(_flowables_minimo(empresa, empleado, periodo_ini, periodo_fin, resumen, styles))
     doc.build(flow, canvasmaker=_WatermarkCanvas)
     return str(path)
+
+
+def generar_pdf_bytes(
+    empresa: Empresa, empleado: Empleado,
+    periodo_ini: date, periodo_fin: date,
+    resumen: ResumenLiquidacion,
+) -> bytes:
+    """PDF de 2 páginas: real + mínimo, retornado como bytes en memoria.
+
+    Compatible con Streamlit Cloud (sin escritura a disco).
+    """
+    styles = _estilos()
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        leftMargin=2 * cm, rightMargin=2 * cm,
+        topMargin=1.5 * cm, bottomMargin=1.5 * cm,
+    )
+    flow = _flowables_real(empresa, empleado, periodo_ini, periodo_fin, resumen, styles)
+    flow.append(PageBreak())
+    flow.extend(_flowables_minimo(empresa, empleado, periodo_ini, periodo_fin, resumen, styles))
+    doc.build(flow, canvasmaker=_WatermarkCanvas)
+    return buf.getvalue()
+

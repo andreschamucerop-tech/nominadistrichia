@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS liquidacion_quincena (
     h_noct           FLOAT   DEFAULT 0.0,
     dominicales      INTEGER DEFAULT 0,
     bonificacion     FLOAT   DEFAULT 0.0,
+    domicilios       FLOAT   DEFAULT 0.0,
     devengado_real   FLOAT   DEFAULT 0.0,
     deducciones_real FLOAT   DEFAULT 0.0,
     neto_real        FLOAT   DEFAULT 0.0,
@@ -112,6 +113,15 @@ CREATE TABLE IF NOT EXISTS prestamo_quincena (
     descripcion     VARCHAR(200) DEFAULT ''
 );
 
+-- 10. Permisos no remunerados
+CREATE TABLE IF NOT EXISTS permiso_no_remunerado (
+    id              SERIAL PRIMARY KEY,
+    empleado_id     INTEGER NOT NULL REFERENCES empleado(id) ON DELETE CASCADE,
+    liquidacion_id  INTEGER REFERENCES liquidacion_quincena(id),
+    fecha           DATE    DEFAULT CURRENT_DATE,
+    descripcion     VARCHAR(200) DEFAULT ''
+);
+
 -- ============================================================
 -- ÍNDICES para mejorar rendimiento de consultas frecuentes
 -- ============================================================
@@ -132,3 +142,21 @@ CREATE INDEX IF NOT EXISTS idx_prestamo_empleado_liq
 
 CREATE INDEX IF NOT EXISTS idx_liq_empleado_periodo
     ON liquidacion_quincena(empleado_id, periodo_inicio);
+
+CREATE INDEX IF NOT EXISTS idx_permiso_empleado_liq
+    ON permiso_no_remunerado(empleado_id, liquidacion_id);
+
+-- ============================================================
+-- MIGRACIONES para bases de datos ya existentes
+-- (ejecutar si la base ya tiene datos y faltan columnas)
+-- ============================================================
+DO $$
+BEGIN
+    -- Agregar columna domicilios a liquidacion_quincena si no existe
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name='liquidacion_quincena' AND column_name='domicilios'
+    ) THEN
+        ALTER TABLE liquidacion_quincena ADD COLUMN domicilios FLOAT DEFAULT 0.0;
+    END IF;
+END $$;

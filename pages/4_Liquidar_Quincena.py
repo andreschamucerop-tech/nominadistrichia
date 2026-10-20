@@ -13,7 +13,7 @@ from core.db import (
     Empleado, Empresa, LiquidacionQuincena, get_session, init_db,
 )
 from core.nomina import liquidar
-from core.pdf import generar_pdf_combinado
+from core.pdf import generar_pdf_bytes
 from core.ui import peso_input
 
 requerir_login()
@@ -211,6 +211,7 @@ with tab_calc:
                     dias_trabajados=r_final.dias_trabajados,
                     h_ord=r_final.h_ord, h_ext=r_final.h_ext, h_noct=r_final.h_noct,
                     dominicales=r_final.dominicales, bonificacion=r_final.bonificacion,
+                    domicilios=r_final.domicilios,
                     devengado_real=r_final.devengado_real,
                     deducciones_real=r_final.deducciones_real, neto_real=r_final.neto_real,
                     devengado_min=r_final.devengado_min,
@@ -219,24 +220,30 @@ with tab_calc:
                 s.add(liq)
                 s.flush()
 
-                path_pdf = generar_pdf_combinado(
+                # Generar PDF en memoria (compatible con Streamlit Cloud)
+                pdf_bytes = generar_pdf_bytes(
                     emp_obj2, emp, periodo_inicio, periodo_fin, r_final,
                 )
-                liq.pdf_real_path = path_pdf
 
-                s.commit()
+                # Guardar nombre del archivo (no path de disco)
+                nombre_pdf = _nombre_pdf(emp.nombres, periodo_inicio, periodo_fin)
+                liq.pdf_real_path = nombre_pdf
                 liq_id = liq.id
-                path_final = liq.pdf_real_path
 
-            with open(path_final, "rb") as fh:
-                pdf_bytes = fh.read()
             st.session_state["_pdf_listo"] = {
                 "bytes": pdf_bytes,
-                "filename": path_final.split("/")[-1],
+                "filename": nombre_pdf,
                 "liq_id": liq_id,
             }
             st.session_state.pop("_liq_pendiente", None)
             st.rerun()
+
+
+def _nombre_pdf(nombres: str, periodo_ini: date, periodo_fin: date) -> str:
+    ini = periodo_ini.strftime("%d-%m-%Y")
+    fin = periodo_fin.strftime("%d-%m-%Y")
+    nombre_seguro = "".join(c for c in nombres if c not in r'\/:*?"<>|')
+    return f"{nombre_seguro} - {ini} al {fin}.pdf"
 
 
 with tab_hist:
@@ -262,27 +269,7 @@ with tab_hist:
         } for (l, e) in liqs]
         st.dataframe(data, use_container_width=True, hide_index=True)
 
-        sel_liq = st.number_input(
-            "ID de liquidación para descargar PDFs",
-            min_value=0, step=1, value=0,
+        st.info(
+            "💡 Los PDFs se generan en el momento de la liquidación. "
+            "Para regenerar un desprendible, vuelve a calcular y confirmar la liquidación."
         )
-        if sel_liq > 0:
-            with get_session() as s:
-                liq = s.get(LiquidacionQuincena, int(sel_liq))
-            if liq:
-                if liq.pdf_real_path:
-                    try:
-                        with open(liq.pdf_real_path, "rb") as fh:
-                            st.download_button(
-                                "⬇️ Descargar desprendible (PDF)",
-                                fh.read(),
-                                file_name=liq.pdf_real_path.split("/")[-1],
-                                mime="application/pdf",
-                                key=f"pdf_{liq.id}",
-                            )
-                    except FileNotFoundError:
-                        st.warning("PDF no encontrado en disco.")
-                else:
-                    st.info("Esta liquidación no tiene PDF guardado.")
-            else:
-                st.error("Liquidación no encontrada.")

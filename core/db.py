@@ -6,6 +6,7 @@ Soporta dos backends:
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
 
@@ -61,7 +62,10 @@ def _crear_engine():
             echo=False,
             future=True,
             poolclass=NullPool,
-            connect_args={"sslmode": "require"},
+            connect_args={
+                "sslmode": "require",
+                "connect_timeout": 10,
+            },
         )
 
     # ── Fallback: SQLite local ────────────────────────────────────────────────
@@ -215,6 +219,7 @@ class LiquidacionQuincena(Base):
     h_noct = Column(Float, default=0.0)
     dominicales = Column(Integer, default=0)
     bonificacion = Column(Float, default=0.0)
+    domicilios = Column(Float, default=0.0)
     devengado_real = Column(Float, default=0.0)
     deducciones_real = Column(Float, default=0.0)
     neto_real = Column(Float, default=0.0)
@@ -234,24 +239,70 @@ def init_db():
 def _migrate():
     """Migraciones incrementales.
 
-    En PostgreSQL (Supabase) las tablas se crean siempre limpias mediante
-    create_all(), por lo que no se requieren migraciones manuales.
-    Solo se ejecuta la migración de SQLite cuando el backend es local.
+    En PostgreSQL (Supabase) también se ejecutan migraciones ALTER TABLE
+    para columnas añadidas después del despliegue inicial.
     """
     eng = _engine()
-    if eng.dialect.name != "sqlite":
-        return  # PostgreSQL: esquema gestionado por create_all()
 
     with eng.connect() as conn:
-        cols_cadena = {r[1] for r in conn.execute(text("PRAGMA table_info(deduccion_cadena)"))}
-        if "fecha" not in cols_cadena:
-            conn.execute(text("ALTER TABLE deduccion_cadena ADD COLUMN fecha DATE"))
-            conn.execute(text(
-                "UPDATE deduccion_cadena SET fecha = mes || '-01' "
-                "WHERE mes IS NOT NULL AND fecha IS NULL"
-            ))
+        if eng.dialect.name == "sqlite":
+            # ── SQLite migrations ─────────────────────────────────────────────
+            cols_cadena = {r[1] for r in conn.execute(text("PRAGMA table_info(deduccion_cadena)"))}
+            if "fecha" not in cols_cadena:
+                conn.execute(text("ALTER TABLE deduccion_cadena ADD COLUMN fecha DATE"))
+                conn.execute(text(
+                    "UPDATE deduccion_cadena SET fecha = mes || '-01' "
+                    "WHERE mes IS NOT NULL AND fecha IS NULL"
+                ))
+                conn.commit()
+
+            cols_liq = {r[1] for r in conn.execute(text("PRAGMA table_info(liquidacion_quincena)"))}
+            if "domicilios" not in cols_liq:
+                conn.execute(text("ALTER TABLE liquidacion_quincena ADD COLUMN domicilios FLOAT DEFAULT 0.0"))
+                conn.commit()
+
+        else:
+            # ── PostgreSQL migrations ─────────────────────────────────────────
+            # Añadir columna domicilios si no existe
+            conn.execute(text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='liquidacion_quincena' AND column_name='domicilios'
+                    ) THEN
+                        ALTER TABLE liquidacion_quincena ADD COLUMN domicilios FLOAT DEFAULT 0.0;
+                    END IF;
+                END $$;
+            """))
+            # Crear tabla permiso_no_remunerado si no existe
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS permiso_no_remunerado (
+                    id              SERIAL PRIMARY KEY,
+                    empleado_id     INTEGER NOT NULL REFERENCES empleado(id) ON DELETE CASCADE,
+                    liquidacion_id  INTEGER REFERENCES liquidacion_quincena(id),
+                    fecha           DATE DEFAULT CURRENT_DATE,
+                    descripcion     VARCHAR(200) DEFAULT ''
+                );
+            """))
             conn.commit()
 
 
+@contextmanager
 def get_session():
-    return _session_factory()()
+    """Context manager que abre y cierra una sesión de base de datos.
+
+    Uso:
+        with get_session() as s:
+            s.query(...)
+    """
+    Session = _session_factory()
+    session = Session
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
