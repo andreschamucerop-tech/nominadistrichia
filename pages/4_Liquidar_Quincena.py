@@ -16,6 +16,13 @@ from core.nomina import liquidar
 from core.pdf import generar_pdf_bytes
 from core.ui import peso_input
 
+def _nombre_pdf(nombres: str, periodo_ini: date, periodo_fin: date) -> str:
+    ini = periodo_ini.strftime("%d-%m-%Y")
+    fin = periodo_fin.strftime("%d-%m-%Y")
+    nombre_seguro = "".join(c for c in nombres if c not in r'\/:*?"<>|')
+    return f"{nombre_seguro} - {ini} al {fin}.pdf"
+
+
 requerir_login()
 init_db()
 st.title("🧾 Liquidar Quincena")
@@ -237,13 +244,6 @@ with tab_calc:
             }
             st.session_state.pop("_liq_pendiente", None)
             st.rerun()
-
-
-def _nombre_pdf(nombres: str, periodo_ini: date, periodo_fin: date) -> str:
-    ini = periodo_ini.strftime("%d-%m-%Y")
-    fin = periodo_fin.strftime("%d-%m-%Y")
-    nombre_seguro = "".join(c for c in nombres if c not in r'\/:*?"<>|')
-    return f"{nombre_seguro} - {ini} al {fin}.pdf"
 
 
 with tab_hist:
