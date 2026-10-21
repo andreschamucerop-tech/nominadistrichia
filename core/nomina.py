@@ -144,6 +144,10 @@ def _horas_semana_ajustadas(
     semanal real (igual criterio que _contar_dominicales). Las horas
     "ordinarias" diarias (ya topadas a 7h/día) se acumulan por semana; lo
     que exceda de 42h se reclasifica como extra.
+
+    Los domingos y festivos trabajados quedan fuera del tope semanal: ya se
+    remuneran con el recargo dominical (ver _contar_dominicales), así que
+    sus horas ordinarias no se acumulan ni se trasladan a extras.
     """
     ini_semana = periodo_inicio - timedelta(days=periodo_inicio.weekday())
     fin_semana = periodo_fin + timedelta(days=6 - periodo_fin.weekday())
@@ -162,6 +166,10 @@ def _horas_semana_ajustadas(
         .all()
     )
 
+    festivos: set[date] = set()
+    for y in {ini_semana.year, fin_semana.year}:
+        festivos |= _festivos_col(y)
+
     h_ord_total = 0.0
     h_ext_total = 0.0
     acumulado_ord = 0.0
@@ -174,6 +182,13 @@ def _horas_semana_ajustadas(
 
         ord_dia = ord_dia or 0.0
         ext_dia = ext_dia or 0.0
+
+        if fecha.weekday() == 6 or fecha in festivos:
+            if periodo_inicio <= fecha <= periodo_fin:
+                h_ord_total += ord_dia
+                h_ext_total += ext_dia
+            continue
+
         ord_permitida = max(0.0, min(ord_dia, JORNADA_SEMANAL_HORAS - acumulado_ord))
         excedente = ord_dia - ord_permitida
         acumulado_ord += ord_permitida
