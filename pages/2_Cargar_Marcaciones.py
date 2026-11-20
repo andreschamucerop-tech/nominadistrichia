@@ -146,13 +146,16 @@ if archivo:
                     errores.append(f"Fila {idx + 2}: {e}")
                     continue
 
-                existente = (
+                # Reemplaza TODAS las marcaciones del empleado en esa fecha
+                # (no solo la primera) para que nunca queden duplicadas.
+                existentes = (
                     s.query(Marcacion)
                     .filter_by(empleado_id=emp.id, fecha=f)
-                    .first()
+                    .all()
                 )
-                if existente:
+                for existente in existentes:
                     s.delete(existente)
+                if existentes:
                     s.flush()
 
                 m = Marcacion(
